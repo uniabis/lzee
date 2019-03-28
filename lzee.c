@@ -1,10 +1,10 @@
 /*
- LZEe - LZE enhancement for z80 by uniabis
+ LZEe - LZE enhancement for Z80 by uniabis
 
  LZE
  Copyright (C)1995,2008 GORRY.
 
- License:original LZE license or zlib/libpng license
+ License:zlib license or original LZE license
 
 This software is provided 'as-is', without any express or implied
 warranty. In no event will the authors be held liable for any damages
@@ -600,8 +600,11 @@ void	decode( unsigned long int size )
 
 void	Usage( void )
 {
-	printf( "Usage: lzee e infile outfile (Encode)\n"
-		"       lzee d infile outfile (Decode)\n"
+	printf(
+		"Usage: lzee e infile outfile (Encode without header)\n"
+		"       lzee E infile outfile (Encode with header)\n"
+		"       lzee d infile outfile (Decode without header)\n"
+		"       lzee D infile outfile (Decode with header)\n"
 	);
 	exit(EXIT_FAILURE);
 }

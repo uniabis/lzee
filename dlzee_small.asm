@@ -29,16 +29,16 @@
 
 	IFNDEF	ALLOW_INLINE_GETBIT
 
-	MACRO GET_BIT
+		MACRO GET_BIT
 		call	getbit
-	ENDM
+		ENDM
 
 	ELSE
 
-	MACRO	GET_BIT
+		MACRO	GET_BIT
 		add	a
 		call	z,getbit
-	ENDM
+		ENDM
 
 	ENDIF
 
@@ -51,9 +51,8 @@ dlze_lp2:
 		jr	c,dlze_lp1
 
 		GET_BIT
-		ld	b,0
 		jr	c,dlze_far
-		ld	c,b
+		ld	bc,0
 
 		GET_BIT
 		rl	c
@@ -64,12 +63,12 @@ dlze_lp2:
 		ld	l,(hl)
 		ld	h,-1
 
-dlze_copy1:
+dlze_copy:
 		inc	c
-dlze_copy2:
 		add	hl,de
 	IFNDEF	ALLOW_LDIR_UNROLLING
 		inc	bc
+		
 		ldir
 	ELSE
 		ldir
@@ -94,19 +93,18 @@ dlze_far:
 		ld	a,c
 		and	7
 		jr	nz,dlze_skip
-		exx
-		pop	hl
-		inc	hl
-		ld	a,(hl)
+		pop	bc
+		inc	bc
+		ld	a,(bc)
 		or	a
 		ret	z
-		push	hl
-		exx
+		push	bc
 		dec	a
 dlze_skip:
+		ld	b,0
 		ld	c,a
 		exa
-		jr	dlze_copy1
+		jr	dlze_copy
 
 getbit:
 	IFNDEF	ALLOW_INLINE_GETBIT

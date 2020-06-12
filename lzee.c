@@ -1,8 +1,9 @@
 /*
- LZEe - LZE enhancement for Z80 by uniabis
 
  LZE
  Copyright (C)1995,2008 GORRY.
+
+ LZEe - LZE enhancement for Z80 by uniabis
 
  License:zlib license or original LZE license
 
@@ -83,6 +84,12 @@ void *memcpy(void *buf1, const void *buf2, size_t n)
 #else
 #define	IDX	256
 #endif
+
+#define FMT_LZE 1
+#define FMT_LZEE 2
+#define FMT_LZEXE 3
+
+static int fmt = FMT_LZEE;
 
 FILE	*infile;
 FILE	*outfile;
@@ -255,12 +262,18 @@ int	get_node( void )
 unsigned int	flags;
 int	flagscnt;
 int	codeptr, code2size;
+
 unsigned char	code[256], code2[4];
 
 void	init_putencode( void )
 {
 	code[0] = 0;
-	codeptr = 1;
+	if (fmt == FMT_LZEXE) {
+		code[1] = 0;
+		codeptr = 2;
+	} else {
+		codeptr = 1;
+	}
 	flags = 0;
 	flagscnt = 0;
 }
@@ -268,6 +281,18 @@ void	init_putencode( void )
 void	sub_putencode( unsigned char c )
 {
 	putc( c, outfile );
+}
+
+static int bitrev( int b )
+{
+	return ((b & (1 << 7)) >> 7)
+		 | ((b & (1 << 6)) >> 5)
+		 | ((b & (1 << 5)) >> 3)
+		 | ((b & (1 << 4)) >> 1)
+		 | ((b & (1 << 3)) << 1)
+		 | ((b & (1 << 2)) << 3)
+		 | ((b & (1 << 1)) << 5)
+		 | ((b & (1 << 0)) << 7);
 }
 
 int	putencode( int r )
@@ -313,8 +338,16 @@ int	putencode( int r )
 #endif
 			fc += 2;
 			mpos = 8192-mpos;
-			code2[0] = (unsigned char) (mpos>>5)&0xf8;
-			code2[1] = (unsigned char) (mpos & 0xff);
+			if ( fmt == FMT_LZEE ) {
+				code2[0] = (unsigned char) (mpos>>5)&0xf8;
+				code2[1] = (unsigned char) (mpos & 0xff);
+			} else if ( fmt == FMT_LZEXE ) {
+				code2[0] = (unsigned char) (mpos & 0xff);
+				code2[1] = (unsigned char) (mpos>>5)&0xf8;
+			} else if ( fmt == FMT_LZE ) {
+				code2[0] = (unsigned char) (mpos>>5)&0xff;
+				code2[1] = (unsigned char) (mpos<<3);
+			}
 			code2[2] = (unsigned char) (mlen-1);
 			code2size = 3;
 		} else if ( mlen > 2) {
@@ -326,8 +359,16 @@ int	putencode( int r )
 #endif
 			fc += 2;
 			mpos = 8192-mpos;
-			code2[0] = (unsigned char) ((mpos>>5)&0xf8)|(mlen-2);
-			code2[1] = (unsigned char) (mpos & 0xff);
+			if ( fmt == FMT_LZEE ) {
+				code2[0] = (unsigned char) ((mpos>>5)&0xf8)|(mlen-2);
+				code2[1] = (unsigned char) (mpos & 0xff);
+			} else if ( fmt == FMT_LZEXE ) {
+				code2[0] = (unsigned char) (mpos & 0xff);
+				code2[1] = (unsigned char) ((mpos>>5)&0xf8)|(mlen-2);
+			} else if ( fmt == FMT_LZE ) {
+				code2[0] = (unsigned char) (mpos>>5)&0xff;
+				code2[1] = (unsigned char) (mpos<<3)|(mlen-2);
+			}
 			code2size = 2;
 		} else {
 			matchlen = 1;
@@ -337,23 +378,45 @@ int	putencode( int r )
 			code2size = 1;
 		}
 	}
-	if ( fc > 8 ) {
-		int	i;
-		unsigned char	*p;
+	if (fmt == FMT_LZEXE) {
+		if ( fc >= 16 ) {
+			int	i;
+			unsigned char	*p;
 
-		fc -= 8;
-		p = &code[0];
-		*(p) = (fl>>fc);
-		DebugMacro( (Debug),  printf( "output code=" ) );
-		for ( i=0; i<codeptr; i++ ) {
-			sub_putencode( *(p++) );
-			DebugMacro( (Debug), printf( "$%02X ", code[i] ) );
+			fc -= 16;
+			p = &code[0];
+			p[0] = bitrev(fl>>(fc + 8));
+			p[1] = bitrev(fl>>(fc + 0));
+			DebugMacro( (Debug),  printf( "output code=" ) );
+			for ( i=0; i<codeptr; i++ ) {
+				sub_putencode( *(p++) );
+				DebugMacro( (Debug), printf( "$%02X ", code[i] ) );
+			}
+			DebugMacro( (Debug), printf( "\n" ) );
+			size += codeptr;
+			codeptr = 2;
+			fl &= (0xffff>>(16-fc));
 		}
-		DebugMacro( (Debug), printf( "\n" ) );
-		size += codeptr;
-		codeptr = 1;
-		fl &= (0x00ff>>(8-fc));
+	} else {
+		if ( fc > 8 ) {
+			int	i;
+			unsigned char	*p;
+
+			fc -= 8;
+			p = &code[0];
+			*(p) = (fl>>fc);
+			DebugMacro( (Debug),  printf( "output code=" ) );
+			for ( i=0; i<codeptr; i++ ) {
+				sub_putencode( *(p++) );
+				DebugMacro( (Debug), printf( "$%02X ", code[i] ) );
+			}
+			DebugMacro( (Debug), printf( "\n" ) );
+			size += codeptr;
+			codeptr = 1;
+			fl &= (0x00ff>>(8-fc));
+		}
 	}
+
 	DebugMacro( (Debug), printf( "store code($%02X)=", codeptr ) );
 	{
 		unsigned char	*p, *q;
@@ -388,18 +451,35 @@ int	finish_putencode( void )
 	code2[1] = (unsigned char) 0;
 	code2[2] = (unsigned char) 0;
 	code2size = 3;
-	if ( flagscnt > 8 ) {
-		flagscnt -= 8;
-		code[0] = (flags>>flagscnt);
-		DebugMacro( (Debug), printf( "output code=" ) );
-		for ( i=0; i<codeptr; i++ ) {
-			putc( code[i], outfile );
-			DebugMacro( (Debug), printf( "$%02X ", code[i] ) );
+	if (fmt == FMT_LZEXE) {
+		if ( flagscnt >= 16 ) {
+			flagscnt -= 16;
+			code[0] = bitrev(flags>>(flagscnt + 8));
+			code[1] = bitrev(flags>>(flagscnt + 0));
+			DebugMacro( (Debug), printf( "output code=" ) );
+			for ( i=0; i<codeptr; i++ ) {
+				putc( code[i], outfile );
+				DebugMacro( (Debug), printf( "$%02X ", code[i] ) );
+			}
+			DebugMacro( (Debug), printf( "\n" ) );
+			size += codeptr;
+			codeptr = 2;
+			flags &= (0xffff>>(16-flagscnt));
 		}
-		DebugMacro( (Debug), printf( "\n" ) );
-		size += codeptr;
-		codeptr = 1;
-		flags &= (0x00ff>>(8-flagscnt));
+	} else {
+		if ( flagscnt > 8 ) {
+			flagscnt -= 8;
+			code[0] = (flags>>flagscnt);
+			DebugMacro( (Debug), printf( "output code=" ) );
+			for ( i=0; i<codeptr; i++ ) {
+				putc( code[i], outfile );
+				DebugMacro( (Debug), printf( "$%02X ", code[i] ) );
+			}
+			DebugMacro( (Debug), printf( "\n" ) );
+			size += codeptr;
+			codeptr = 1;
+			flags &= (0x00ff>>(8-flagscnt));
+		}
 	}
 	DebugMacro( (Debug), printf( "store code($%02X)=", codeptr ) );
 	for ( i=0; i<code2size; i++ ) {
@@ -408,18 +488,36 @@ int	finish_putencode( void )
 	}
 	DebugMacro( (Debug), printf( "\n" ) );
 
-	if ( flagscnt > 0 ) {
-		code[0] = (flags<<(8-flagscnt));
-	}
-	if ( codeptr > 1 ) {
-		DebugMacro( (Debug), printf( "output code=" ) );
-		for ( i=0; i<codeptr; i++ ) {
-			putc( code[i], outfile );
-			DebugMacro( (Debug),  printf( "$%02X ", code[i] ) );
+	if (fmt == FMT_LZEXE) {
+		if ( flagscnt > 0 ) {
+			flags<<=(16-flagscnt);
+			code[0] = bitrev(flags>>(0 + 8));
+			code[1] = bitrev(flags>>(0 + 0));
 		}
-		DebugMacro( (Debug), printf( "\n" ) );
-		size += codeptr;
+		if ( codeptr > 2 ) {
+			DebugMacro( (Debug), printf( "output code=" ) );
+			for ( i=0; i<codeptr; i++ ) {
+				putc( code[i], outfile );
+				DebugMacro( (Debug),  printf( "$%02X ", code[i] ) );
+			}
+			DebugMacro( (Debug), printf( "\n" ) );
+			size += codeptr;
+		}
+	} else {
+		if ( flagscnt > 0 ) {
+			code[0] = (flags<<(8-flagscnt));
+		}
+		if ( codeptr > 1 ) {
+			DebugMacro( (Debug), printf( "output code=" ) );
+			for ( i=0; i<codeptr; i++ ) {
+				putc( code[i], outfile );
+				DebugMacro( (Debug),  printf( "$%02X ", code[i] ) );
+			}
+			DebugMacro( (Debug), printf( "\n" ) );
+			size += codeptr;
+		}
 	}
+
 
 	return (size);
 }
@@ -449,20 +547,22 @@ void	encode( void )
 	len = i;
 	if ( incount == 0 ) return;
 #if BZCOMPATIBLE
-	insert_node( r );
-	sub_putencode( text[r] );
-	c = getc( infile );
-	incount++;
-	if ( c != EOF ) {
-		text[s] = c;
-		if ( s < (F-1) ) text[s+N] = c;
-		s = (s+1) & (N-1);
-		r = (r+1) & (N-1);
-	} else {
-		s = (s+1) & (N-1);
-		r = (r+1) & (N-1);
-		len--;
-		if ( !len ) goto NoEncode;
+	if ( fmt != FMT_LZEXE ) {
+		insert_node( r );
+		sub_putencode( text[r] );
+		c = getc( infile );
+		incount++;
+		if ( c != EOF ) {
+			text[s] = c;
+			if ( s < (F-1) ) text[s+N] = c;
+			s = (s+1) & (N-1);
+			r = (r+1) & (N-1);
+		} else {
+			s = (s+1) & (N-1);
+			r = (r+1) & (N-1);
+			len--;
+			if ( !len ) goto NoEncode;
+		}
 	}
 #endif
 	insert_node( r );
@@ -526,7 +626,17 @@ void	decode( unsigned long int size )
 	int	bit;
 
 #define	GetBit()						\
-{								\
+if ( fmt == FMT_LZEXE ) {						\
+	bit = (flags & 1);						\
+	flags >>= 1;						\
+	if ((--flagscnt)<=0) {					\
+		if ((c = getc(infile)) == EOF ) goto Err;	\
+		flags = c;	\
+		if ((c = getc(infile)) == EOF ) goto Err;	\
+		flags |= c << 8;	\
+		flagscnt = 16;					\
+	}							\
+} else {								\
 	if ((--flagscnt)<0) {					\
 		if ((c = getc(infile)) == EOF ) goto Err;	\
 		DebugMacro( (Debug>99), printf( "\nGetBit($%02X) ", c ) );	\
@@ -536,15 +646,24 @@ void	decode( unsigned long int size )
 	bit = ((flags<<=1) & 256 );				\
 }								
 
-	r = N-F;
-#if BZCOMPATIBLE
-	if ((c = getc(infile)) == EOF ) goto Err;
-	putc( c, outfile );
-	text[r++] = c;
-	r &= (N-1);
-#endif
 	flags = 0;
 	flagscnt = 0;
+	if ( fmt == FMT_LZEXE ) {
+		if ((c = getc(infile)) == EOF ) goto Err;
+		flags = c;
+		if ((c = getc(infile)) == EOF ) goto Err;
+		flags |= c << 8;
+		flagscnt = 16;
+	}
+	r = N-F;
+#if BZCOMPATIBLE
+	if ( fmt != FMT_LZEXE ) {
+		if ((c = getc(infile)) == EOF ) goto Err;
+		putc( c, outfile );
+		text[r++] = c;
+		r &= (N-1);
+	}
+#endif
 	do {
 		GetBit();
 		if (bit) {
@@ -562,12 +681,23 @@ void	decode( unsigned long int size )
 				if ((i = getc(infile)) == EOF ) goto Err;
 				if ((j = getc(infile)) == EOF ) goto Err;
 				DebugMacro( (Debug>99), printf( "01($%02X,$%02X) ", i, j ) );
-				u = ((i & 0xf8)<<5) | j;
-				j = i & 0x07;
+				if ( fmt == FMT_LZEE ) {
+					u = ((i & 0xf8)<<5) | j;
+					j = i & 0x07;
+				} else if ( fmt == FMT_LZEXE ) {
+					u = ((j & 0xf8)<<5) | i;
+					j = j & 0x07;
+				} else if ( fmt == FMT_LZE ) {
+					u = ((i<<8) | j)>>3;
+					j = j & 0x07;
+				} else { goto Err; }
 				if ( j == 0 ) {
 					if ((j = getc(infile)) == EOF ) goto Err;
 					DebugMacro( (Debug>99), printf( "($%02X) ", j ) );
 					if ( j==0 ) goto Quit;
+					if ( fmt == FMT_LZEXE ) {
+						if ( j==1 ) continue;
+					}
 					j++;
 				} else {
 					j += 2;
@@ -601,10 +731,22 @@ void	decode( unsigned long int size )
 void	Usage( void )
 {
 	printf(
-		"Usage: lzee e infile outfile (Encode without header)\n"
-		"       lzee E infile outfile (Encode with header)\n"
-		"       lzee d infile outfile (Decode without header)\n"
-		"       lzee D infile outfile (Decode with header)\n"
+		"Usage: lzee [option] {command} {infile} {outfile}\n"
+		"\n"
+		"  {command}\n"
+		"    e : Encode without header\n"
+		"    E : Encode with header\n"
+		"    d : Decode without header\n"
+		"    D : Decode with header\n"
+		"\n"
+		"  [option]\n"
+		"    f[format]...\n"
+		"\n"
+		"  [format]\n"
+		"    1 : LZE\n"
+		"    2 : LZEE(default)\n"
+		"    3 : LZEXE RAW\n"
+		"    r : Force without header\n"
 	);
 	exit(EXIT_FAILURE);
 }
@@ -616,6 +758,31 @@ int	main( int argc, char *argv[] )
 
 	char	*inbuf;
 	char	*outbuf;
+	int		raw = 0;
+
+	if ( argc > 1 && (argv[1][0] | 0x20) == 'f') {
+		int p = 1;
+		char f;
+		while ((f = argv[1][p++]) != 0) {
+			switch ( f ) {
+			case '1':
+				fmt = FMT_LZE;
+				break;
+			case '2':
+				fmt = FMT_LZEE;
+				break;
+			case '3':
+				fmt = FMT_LZEXE;
+				break;
+			case 'R':
+			case 'r':
+				raw = 1;
+				break;
+			}
+		}
+		argv++;
+		argc--;
+	}
 
 	if ( argc != 4 ) Usage();
 	infile = fopen( argv[2], "rb" );
@@ -630,22 +797,25 @@ int	main( int argc, char *argv[] )
 	}
 	switch( *argv[1] ) {
 	  case	'E':
-
-		fseek( infile, 0L, SEEK_END );
-		size = ftell( infile );
-		putc( (int)((size >> 24) & 0xff), outfile );
-		putc( (int)((size >> 16) & 0xff), outfile );
-		putc( (int)((size >>  8) & 0xff), outfile );
-		putc( (int)((size >>  0) & 0xff), outfile );
-		rewind( infile );
+		if ( !raw ) {
+			fseek( infile, 0L, SEEK_END );
+			size = ftell( infile );
+			putc( (int)((size >> 24) & 0xff), outfile );
+			putc( (int)((size >> 16) & 0xff), outfile );
+			putc( (int)((size >>  8) & 0xff), outfile );
+			putc( (int)((size >>  0) & 0xff), outfile );
+			rewind( infile );
+		}
 	  case	'e':
 		encode();
 		break;
 	  case	'D':
-		size  = (((unsigned long)getc( infile )) << 24);
-		size |= (((unsigned long)getc( infile )) << 16);
-		size |= (((unsigned long)getc( infile )) <<  8);
-		size |= (((unsigned long)getc( infile )) <<  0);
+		if ( !raw ) {
+			size  = (((unsigned long)getc( infile )) << 24);
+			size |= (((unsigned long)getc( infile )) << 16);
+			size |= (((unsigned long)getc( infile )) <<  8);
+			size |= (((unsigned long)getc( infile )) <<  0);
+		}
 	  case	'd':
 		decode( size );
 		break;

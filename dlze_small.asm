@@ -1,4 +1,4 @@
-; lzee depacker for Z80 sjasm
+; lze depacker for Z80 sjasm
 ;
 ; license:zlib license
 ;
@@ -52,8 +52,8 @@ dlze_lp2:
 
 		GET_BIT
 		jr	c,dlze_far
+		ld	bc,0
 
-		ld	c,0
 		GET_BIT
 		rl	c
 		GET_BIT
@@ -64,12 +64,10 @@ dlze_lp2:
 		ld	h,-1
 
 dlze_copy:
-		ld	b,0
 		inc	c
 		add	hl,de
 	IFNDEF	ALLOW_LDIR_UNROLLING
 		inc	bc
-		
 		ldir
 	ELSE
 		ldir
@@ -81,30 +79,32 @@ dlze_copy:
 
 dlze_far:
 		ex      af, af';'
-
-		ld	a,(hl)
-		or	7
-		rrca
-		rrca
-		rrca
-		ld	b,a
-
 		ld	a,(hl)
 		inc	hl
-		ld	c,(hl)
-
+		push	hl
+		ld	l,(hl)
+		ld	c,l
+		rra
+		rr	l
+		rra
+		rr	l
+		rra
+		rr	l
+		or	0e0h
+		ld	h,a
+		ld	a,c
 		and	7
 		jr	nz,dlze_skip
 
-		inc	hl
-		or	(hl)
-		ret	z
-		dec	a
+		pop	bc
+		inc	bc
+		ld	a,(bc)
+		sub	1
+		ret	c
+		push	bc
 
 dlze_skip:
-		push	hl
-		ld	l,c
-		ld	h,b
+		ld	b,0
 		ld	c,a
 		ex      af, af';'
 		jr	dlze_copy

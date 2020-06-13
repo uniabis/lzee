@@ -1,4 +1,4 @@
-; lzee depacker for Z80 sjasm
+; lze depacker for Z80 sjasm
 ;
 ; license:zlib license
 ;
@@ -24,39 +24,34 @@
 ;   distribution.
 ;
 
-	;DEFINE	ALLOW_LDIR_UNROLLING
-	;DEFINE	ALLOW_INLINE_GETBIT
-
-	IFNDEF	ALLOW_INLINE_GETBIT
-
-		MACRO GET_BIT
-		call	getbit
-		ENDM
-
-	ELSE
-
-		MACRO	GET_BIT
-		add	a
-		call	z,getbit
-		ENDM
-
-	ENDIF
-
 dlze:
-		ld	a,080h
+		ldi
+		scf
+
+getbit1:
+		ld	a,(hl)
+		inc	hl
+		adc	a,a
+		jr	nc,dlze_lp1n
+
 dlze_lp1:
 		ldi
 dlze_lp2:
-		GET_BIT
+		add	a
+		jr	z,getbit1
 		jr	c,dlze_lp1
-
-		GET_BIT
+dlze_lp1n:
+		add	a
+		call	z,getbit
 		jr	c,dlze_far
+		ld	bc,0
 
-		ld	c,0
-		GET_BIT
+		add	a
+		call	z,getbit
 		rl	c
-		GET_BIT
+
+		add	a
+		call	z,getbit
 		rl	c
 
 		push	hl
@@ -64,56 +59,47 @@ dlze_lp2:
 		ld	h,-1
 
 dlze_copy:
-		ld	b,0
 		inc	c
 		add	hl,de
-	IFNDEF	ALLOW_LDIR_UNROLLING
-		inc	bc
-		
-		ldir
-	ELSE
 		ldir
 		ldi
-	ENDIF
 		pop	hl
 		inc	hl
 		jr	dlze_lp2
 
 dlze_far:
 		ex      af, af';'
-
-		ld	a,(hl)
-		or	7
-		rrca
-		rrca
-		rrca
-		ld	b,a
-
 		ld	a,(hl)
 		inc	hl
-		ld	c,(hl)
-
+		push	hl
+		ld	l,(hl)
+		ld	c,l
+		rra
+		rr	l
+		rra
+		rr	l
+		rra
+		rr	l
+		or	0e0h
+		ld	h,a
+		ld	a,c
 		and	7
 		jr	nz,dlze_skip
 
-		inc	hl
-		or	(hl)
-		ret	z
-		dec	a
+		pop	bc
+		inc	bc
+		ld	a,(bc)
+		sub	1
+		ret	c
+		push	bc
 
 dlze_skip:
-		push	hl
-		ld	l,c
-		ld	h,b
+		ld	b,0
 		ld	c,a
 		ex      af, af';'
 		jr	dlze_copy
 
 getbit:
-	IFNDEF	ALLOW_INLINE_GETBIT
-		add	a
-		ret	nz
-	ENDIF
 		ld	a,(hl)
 		inc	hl
 		adc	a

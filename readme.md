@@ -106,7 +106,7 @@ test data:ALL(16*16KB)
 |lz49|lz49decrunch_v001_180|            101|        195,027<br />(74.39%)|     11,002,608<br />(LDIR x 1.82)|
 |lze|lzdec|            119|        174,182<br />(66.44%)|     21,831,226<br />(LDIR x 3.62)|
 |lze|dlze_fast|             90|        174,182<br />(66.44%)|     17,122,936<br />(LDIR x 2.83)|
-|lze|dlze_small|             82|        174,182<br />(66.44%)|     21,740,981<br />(LDIR x 3.60)|
+|lze|dlze_small|             79|        174,182<br />(66.44%)|     21,975,061<br />(LDIR x 3.64)|
 |lzee|dlzee_fast|             84|        174,118<br />(66.42%)|     16,483,906<br />(LDIR x 2.73)|
 |lzee|dlzee_small|             73|        174,118<br />(66.42%)|     21,336,031<br />(LDIR x 3.53)|
 |lzexe|z80unlze|            156|        174,132<br />(66.42%)|     25,663,296<br />(LDIR x 4.25)|

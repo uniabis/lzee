@@ -89,7 +89,8 @@ void *memcpy(void *buf1, const void *buf2, size_t n)
 #define FMT_LZE 1
 #define FMT_LZEE 2
 #define FMT_LZEXE 3
-#define FMT_LZEEE 4
+#define FMT_LZEEE_OBSOLETED_F4 4
+#define FMT_LZEEE_F5 5
 
 static int fmt = FMT_LZEE;
 
@@ -312,22 +313,22 @@ int	putencode( int r )
 	size = 0;
 	if ( mlen < 2 ) {
 		matchlen = 1;
-		fl = (fl+fl)+(fmt == FMT_LZEEE ? 0 : 1);
+		fl = (fl+fl)+((fmt == FMT_LZEEE_OBSOLETED_F4 || fmt == FMT_LZEEE_F5) ? 0 : 1);
 		fc += 1;
 		code2[0] = text[r];
 		code2size = 1;
 	} else {
 		if ( ( mlen < 6 ) && ( mpos < 257 ) ) {
-			fl = (fl<<4)+(mlen-2)+(fmt == FMT_LZEEE ? 8 : 0);
+			fl = (fl<<4)+(mlen-2)+((fmt == FMT_LZEEE_OBSOLETED_F4 || fmt == FMT_LZEEE_F5) ? 8 : 0);
 			fc += 4;
 			mpos = 256-mpos;
 			code2[0] = (unsigned char) (mpos);
 			code2size = 1;
 		} else if ( mlen > 9 ) {
-			fl = (fl<<2)+(fmt == FMT_LZEEE ? 1 | 2 : 1);
+			fl = (fl<<2)+((fmt == FMT_LZEEE_OBSOLETED_F4 || fmt == FMT_LZEEE_F5) ? 1 | 2 : 1);
 			fc += 2;
 			mpos = 8192-mpos;
-			if ( fmt == FMT_LZEE || fmt == FMT_LZEEE ) {
+			if (fmt == FMT_LZEE || fmt == FMT_LZEEE_OBSOLETED_F4 || fmt == FMT_LZEEE_F5) {
 				code2[0] = (unsigned char) (mpos>>5)&0xf8;
 				code2[1] = (unsigned char) (mpos & 0xff);
 			} else if ( fmt == FMT_LZEXE ) {
@@ -337,13 +338,13 @@ int	putencode( int r )
 				code2[0] = (unsigned char) (mpos>>5)&0xff;
 				code2[1] = (unsigned char) (mpos<<3);
 			}
-			code2[2] = (unsigned char) (mlen-1);
+			code2[2] = (unsigned char) (mlen-((fmt == FMT_LZEEE_F5) ? 2 : 1));
 			code2size = 3;
 		} else if ( mlen > 2) {
-			fl = (fl<<2)+(fmt == FMT_LZEEE ? 1 | 2 : 1);
+			fl = (fl<<2)+((fmt == FMT_LZEEE_OBSOLETED_F4 || fmt == FMT_LZEEE_F5) ? 1 | 2 : 1);
 			fc += 2;
 			mpos = 8192-mpos;
-			if ( fmt == FMT_LZEE || fmt == FMT_LZEEE ) {
+			if (fmt == FMT_LZEE || fmt == FMT_LZEEE_OBSOLETED_F4 || fmt == FMT_LZEEE_F5) {
 				code2[0] = (unsigned char) ((mpos>>5)&0xf8)|(mlen-2);
 				code2[1] = (unsigned char) (mpos & 0xff);
 			} else if ( fmt == FMT_LZEXE ) {
@@ -356,7 +357,7 @@ int	putencode( int r )
 			code2size = 2;
 		} else {
 			matchlen = 1;
-			fl = (fl+fl)+(fmt == FMT_LZEEE ? 0 : 1);
+			fl = (fl+fl)+((fmt == FMT_LZEEE_OBSOLETED_F4 || fmt == FMT_LZEEE_F5) ? 0 : 1);
 			fc += 1;
 			code2[0] = text[r];
 			code2size = 1;
@@ -428,7 +429,7 @@ int	finish_putencode( void )
 	int	size;
 
 	size = 0;
-	flags = (flags << 2)+(fmt == FMT_LZEEE ? 1 | 2 : 1);
+	flags = (flags << 2)+((fmt == FMT_LZEEE_OBSOLETED_F4 || fmt == FMT_LZEEE_F5) ? 1 | 2 : 1);
 	flagscnt += 2;
 	code2[0] = (unsigned char) 0;
 	code2[1] = (unsigned char) 0;
@@ -649,7 +650,7 @@ if ( fmt == FMT_LZEXE ) {						\
 #endif
 	do {
 		GetBit();
-		if ( fmt == FMT_LZEEE ) bit = !bit;
+		if (fmt == FMT_LZEEE_OBSOLETED_F4 || fmt == FMT_LZEEE_F5) bit = !bit;
 		if (bit) {
 						/* 1 */
 			if ((c = getc(infile)) == EOF ) break;
@@ -665,7 +666,7 @@ if ( fmt == FMT_LZEXE ) {						\
 				if ((i = getc(infile)) == EOF ) goto Err;
 				if ((j = getc(infile)) == EOF ) goto Err;
 				DebugMacro( (Debug>99), printf( "01($%02X,$%02X) ", i, j ) );
-				if ( fmt == FMT_LZEE || fmt == FMT_LZEEE ) {
+				if (fmt == FMT_LZEE || fmt == FMT_LZEEE_OBSOLETED_F4 || fmt == FMT_LZEEE_F5) {
 					u = ((i & 0xf8)<<5) | j;
 					j = i & 0x07;
 				} else if ( fmt == FMT_LZEXE ) {
@@ -682,7 +683,7 @@ if ( fmt == FMT_LZEXE ) {						\
 					if ( fmt == FMT_LZEXE ) {
 						if ( j==1 ) continue;
 					}
-					j++;
+					j += (fmt == FMT_LZEEE_F5) ? 2 : 1;
 				} else {
 					j += 2;
 				}
@@ -730,7 +731,8 @@ void	Usage( void )
 		"    1 : lze\n"
 		"    2 : LZEe(default)\n"
 		"    3 : LZEXE RAW\n"
-		"    4 : LZEee\n"
+		"    4 : LZEee f4(obsoleted) \n"
+		"    5 : LZEee f5\n"
 		"    r : Force without header\n"
 	);
 	exit(EXIT_FAILURE);
@@ -760,7 +762,10 @@ int	main( int argc, char *argv[] )
 				fmt = FMT_LZEXE;
 				break;
 			case '4':
-				fmt = FMT_LZEEE;
+				fmt = FMT_LZEEE_OBSOLETED_F4;
+				break;
+			case '5':
+				fmt = FMT_LZEEE_F5;
 				break;
 			case 'R':
 			case 'r':

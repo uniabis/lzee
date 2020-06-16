@@ -114,7 +114,7 @@ test data:DEOCM-PLD-CV BIOS(16x16KB)
 |lze|lzdec|            119|        174,182<br />(66.44%)|     21,831,226<br />(LDIR x 3.62)|
 |lze|dlze_fast|             90|        174,182<br />(66.44%)|     17,122,936<br />(LDIR x 2.83)|
 |lze|dlze_small|             79|        174,182<br />(66.44%)|     21,975,061<br />(LDIR x 3.64)|
-|lzeee|dlzeee_fast|             83|        174,118<br />(66.42%)|     16,000,675<br />(LDIR x 2.65)|
+|lzeee|dlzeee_fast|             87|        174,118<br />(66.42%)|     15,771,965<br />(LDIR x 2.61)|
 |lzeee|dlzeee_small|             72|        174,118<br />(66.42%)|     21,330,646<br />(LDIR x 3.53)|
 |lzexe|z80unlze|            156|        174,132<br />(66.42%)|     25,663,296<br />(LDIR x 4.25)|
 |lzexe|z80unlzep2|            133|        174,132<br />(66.42%)|     23,882,407<br />(LDIR x 3.96)|

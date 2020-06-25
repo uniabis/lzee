@@ -1,4 +1,4 @@
-; LZEee depacker for Z80 sjasm (lzee  with f5 option) 72bytes
+; LZEee depacker for Z80 sjasm (lzee  with f5 option) 97bytes
 ;
 ; license:zlib license
 ;
@@ -25,101 +25,104 @@
 ;
 
 	;DEFINE	OBSOLETED_F4
-	;DEFINE	ALLOW_LDIR_UNROLLING
-	;DEFINE	ALLOW_INLINE_GETBIT
-
-	IFNDEF	ALLOW_INLINE_GETBIT
-
-		MACRO GET_BIT
-		call	getbit
-		ENDM
-
-	ELSE
-
-		MACRO	GET_BIT
-		add	a
-		call	z,getbit
-		ENDM
-
-	ENDIF
 
 dlzeee:
-		ld	a,080h
+		ldi
+		scf
+
+getbit1:
+		ld	a,(hl)
+		inc	hl
+		adc	a,a
+		jr	c,dlze_lp1n
+
+		DUP	1
+		ldi
+		add	a
+		jr	c,dlze_lp1n
+		EDUP
+
 dlze_lp1:
 		ldi
 dlze_lp2:
-		GET_BIT
+		add	a
 		jr	nc,dlze_lp1
-
-		GET_BIT
+		jr	z,getbit1
+dlze_lp1n:
+		add	a
 		jr	c,dlze_far
+dlze_near:
+		ld	bc,080h
 
-		ld	c,0
-		GET_BIT
+		add	a
+		jr	z,getbit3
 		rl	c
-		GET_BIT
+
+		add	a
+		jr	z,getbit3
+dlze_near_end1:
 		rl	c
+dlze_near_end2:
 
 		push	hl
 		ld	l,(hl)
 		ld	h,-1
 
 dlze_copy:
-		ld	b,0
 		inc	c
 		add	hl,de
-	IFNDEF	ALLOW_LDIR_UNROLLING
-		inc	bc
-		
-		ldir
-	ELSE
 		ldir
 		ldi
-	ENDIF
 		pop	hl
 		inc	hl
-		jr	dlze_lp2
+		jp	dlze_lp2
+
+getbit2:
+		ld	a,(hl)
+		inc	hl
+		adc	a,a
+		jr	nc,dlze_near
 
 dlze_far:
+		jr	z,getbit2
 		ex      af, af';'
-
 		ld	a,(hl)
+		inc	hl
+		push	hl
+		ld	l,(hl)
+		ld	c,a
 		or	7
 		rrca
 		rrca
 		rrca
-		ld	b,a
-
-		ld	a,(hl)
-		inc	hl
-		ld	c,(hl)
-
+		ld	h,a
+		ld	a,c
 		and	7
 		jr	nz,dlze_skip
 
-		inc	hl
-		or	(hl)
-		ret	z
+		pop	bc
+		inc	bc
+		ld	a,(bc)
 	IFNDEF	OBSOLETED_F4
+		or	a
+		ret	z
 	ELSE
-		dec	a
+		sub	1
+		ret	c
 	ENDIF
+		push	bc
 
 dlze_skip:
-		push	hl
-		ld	l,c
-		ld	h,b
+		ld	b,0
 		ld	c,a
 		ex      af, af';'
 		jr	dlze_copy
 
-getbit:
-	IFNDEF	ALLOW_INLINE_GETBIT
-		add	a
-		ret	nz
-	ENDIF
+getbit3:
 		ld	a,(hl)
 		inc	hl
 		adc	a
-		ret
-
+		rl	c
+		jr	nc,dlze_near_end2
+		add	a
+		jr	dlze_near_end1
